@@ -32,7 +32,7 @@ class LipDataset(Dataset):
             text_files = [name for name in os.listdir(path) if name.endswith(".txt")]
             video_files = [name for name in os.listdir(path) if name.endswith(".mp4")]
             if len(text_files) != len(video_files):
-                print ("errorenous folder")
+                print ("WARNING !! check dataset")
                 continue
             length = len(text_files)
             for i in range (length):

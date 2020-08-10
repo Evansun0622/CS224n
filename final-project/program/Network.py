@@ -5,10 +5,9 @@ import torch.nn.functional as F
 import Resnet
 import torch.optim as optim
 from Tcn import MultiscaleMultibranchTCN
-
 MAX_WORD_COUNT = 24
 VOCAB = 17978
-BATCH_SIZE = 32
+BATCH_SIZE = 2
 
 class Network(nn.Module):
 
@@ -36,7 +35,7 @@ class Network(nn.Module):
         
 
     def forward(self,t):
-        
+        tm = time.time() 
         t = self.conv1(t)
         t = F.relu(t)
         t = F.max_pool3d(t, kernel_size = 2, stride = 2)
@@ -45,16 +44,13 @@ class Network(nn.Module):
         t = F.relu(t)
         t = F.max_pool3d(t, kernel_size = 2, stride = 2)
 
-
         t = self.resnet(t)
-
         if t.shape[0] != 1: #input is a batch
             all_t = torch.unbind(t)
             t = torch.stack([self.tcn(torch.reshape(t0,[15,3,512])) for t0 in all_t])
         else:
             t = self.tcn(torch.reshape(t,[15,3,512]))
             t = torch.unsqueeze(t,0)
-
         t = torch.flatten(t, start_dim = 1)
 
         t = self.lin1(t)
@@ -63,24 +59,24 @@ class Network(nn.Module):
 
         # t = torch.reshape(t,[-1,15,45*3])
         # t = self.lstm(t)
-        
         return t
 
 if __name__ == "__main__":
     #for testing purposes
     network = Network()
     train_set = LipDataset()
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size = 1, shuffle=True)
-    optimizer = optim.Adam(network.parameters(), lr = 0.1)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size = BATCH_SIZE, shuffle=True)
+    optimizer = optim.Adam([parameters for parameters in network.parameters() if parameters.requires_grad], lr = 0.1)
     for batch in train_loader:
         videos, labels = batch
         preds = network(videos)
         for i in range (MAX_WORD_COUNT):
-            p = preds[:,i,:]
-            l = labels[:,i]
+            p = preds[:,i,:].clone()
+            l = labels[:,i].clone()
             loss = F.cross_entropy(p,l)
             print (loss.item())
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            loss.backward(retain_graph=True)
+        optimizer.step()
+        optimizer.zero_grad()
     
